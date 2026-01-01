@@ -5,6 +5,6 @@
   </tr>
   <tr>
     <td><img src="images/wikipedia20000.jpg" width="100%"></td>
-    <td><img src="images/buddhacpp20000.png" width="100%"></td>
+    <td><img src="images/buddha20000.png" width="100%"></td>
   </tr>
 </table>
