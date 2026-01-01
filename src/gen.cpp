@@ -6,9 +6,9 @@ using u8 = unsigned char;
 #define f first
 #define s second
 
-const int N = 4096;
-const long long RAND_ITER = 6'000'000'000;
-const int MX_ITER = 200;
+const int N = 8192;
+const long long RAND_ITER = 100'000'000'000;
+const int MX_ITER = 20000;
 const int DROP = 0;
 const int NUM_THREADS = 16;
 const f64 L = -1.25;
@@ -148,7 +148,7 @@ int main(){
         }
     }
 
-    FILE* f = fopen("buddhacpp.ppm", "wb");
+    FILE* f = fopen("buddhacpp2.ppm", "wb");
     fprintf(f, "P6\n%d %d\n255\n", N, N);
     for (int i=0;i<N;++i) {
         for(int j=0;j<N;j++){
