@@ -7,12 +7,14 @@ using u8 = unsigned char;
 #define s second
 
 const int N = 4096;
-const long long RAND_ITER = 200'000'000;
-const int MX_ITER = 20;
+const long long RAND_ITER = 6'000'000'000;
+const int MX_ITER = 200;
 const int DROP = 0;
 const int NUM_THREADS = 16;
-const f64 L = -2.0;
-const f64 R = 2.0;
+const f64 L = -1.25;
+const f64 R = 1.25;
+const f64 D = -1.60;
+const f64 U = 0.90;
 const f64 LEN = (R-L)/(N-1);
 
 #pragma pack(push, 1)
@@ -50,7 +52,7 @@ struct PCG32 {
 };
 
 RGB image[N][N];
-f64 cnt[(N/2+1)*N];
+f64 cnt[N*N];
 pair<f64,f64> hist[NUM_THREADS][MX_ITER];
 bool f = false;
 
@@ -63,18 +65,14 @@ inline bool in_cardioid_or_bulb(const f64 cr, const f64 ci){
     return false;
 }
 
-inline void splat(f64 x, f64 y, f64 (&cnt)[(N/2+1)*N]) {
+inline void splat(f64 x, f64 y, f64 (&cnt)[N*N]) {
     int x0 = floor(x), y0 = floor(y);
     x -= x0; y -= y0;
-    if (0<=x0 && x0+1<N && 0<=y0 && y0+1<N) {
-        #pragma omp atomic update
-        cnt[x0*(N/2+1)+y0] += (1-x)*(1-y);
-        #pragma omp atomic update
-        cnt[x0*(N/2+1)+y0+1] += (1-x)*y;
-        #pragma omp atomic update
-        cnt[(x0+1)*(N/2+1)+y0] += x*(1-y);
-        #pragma omp atomic update
-        cnt[(x0+1)*(N/2+1)+y0+1] += x*y;
+    if (0<=x0 && x0+1<N && y0+1<N) { // 0<=y0 needn't be checked
+        cnt[x0*N+y0] += (1-x)*(1-y); // atomic updates are not needed
+        cnt[x0*N+y0+1] += (1-x)*y; // if 2 threads want to write
+        cnt[(x0+1)*N+y0] += x*(1-y); // there will be negligable error
+        cnt[(x0+1)*N+y0+1] += x*y;
     }
 }
 
@@ -89,7 +87,6 @@ int main(){
         for(long long _=0;_<RAND_ITER;_++){
             f64 x0 = rng.uniform_neg2_to_2();
             f64 y0 = rng.uniform_neg2_to_2();
-            if(x0 == 2 || x0 == -2 || y0 == 2 || -y0 == 2) continue;
             if(in_cardioid_or_bulb(x0, y0)) continue;
             f64 x=0, y=0, x2=0, y2=0;
             int iter = 0;
@@ -105,7 +102,11 @@ int main(){
 
             if(iter < MX_ITER && iter > DROP){
                 for(int i=0;i<iter-1;i++){
-                    f64 px = (hist[thr_num][i].f - L) / LEN;
+                    if( hist[thr_num][i].f < D - LEN || 
+                        hist[thr_num][i].f > U + LEN || 
+                        hist[thr_num][i].s < L - LEN || 
+                        hist[thr_num][i].s > R + LEN) continue;
+                    f64 px = (hist[thr_num][i].f - D) / LEN;
                     f64 py = ((hist[thr_num][i].s >= 0 ? hist[thr_num][i].s : -hist[thr_num][i].s) - L) / LEN;
                     splat(px, py, cnt);
                 }
@@ -114,19 +115,23 @@ int main(){
     }
 
     for(int i=0;i<N;i++){
-        //f64 v = cnt[i*(N/2+1)+N/2-1] + cnt[i*(N/2+1)+N/2];
-        cnt[i*(N/2+1)+N/2-1] += cnt[i*(N/2+1)+N/2];
+        for(int j=0;j<N/2-1;j++){
+            cnt[i*N+j] += cnt[i*N+N-j-1];
+        }
+        f64 v = cnt[i*N+N/2-1] + cnt[i*N+N/2];
+        cnt[i*N+N/2-1] = v;
+        cnt[i*N+N/2] = v;
     }
 
     f64 mx = 0;
     for(int i=0;i<N;i++){
         for(int j=0;j<N/2;j++){
-            mx = max(mx, cnt[i*(N/2+1)+j]);
+            mx = max(mx, cnt[i*N+j]);
         }
     }
 
-    std::vector<int> flat; flat.reserve((N/2+1)*N);
-    for (int i=0;i<N;i++) for (int j=0;j<N/2;j++) flat.push_back(cnt[i*(N/2+1)+j]);
+    std::vector<int> flat; flat.reserve(N*N);
+    for (int i=0;i<N;i++) for (int j=0;j<N;j++) flat.push_back(cnt[i*N+j]);
     size_t k = (size_t)std::floor(0.995 * flat.size());
     std::nth_element(flat.begin(), flat.begin()+k, flat.end());
     mx = flat[k];
@@ -137,7 +142,7 @@ int main(){
     for (int i=0;i<N;i++) {
         for (int j=0;j<N;j++) {
             //f64 v = (f64)log(1.0 + exposure * min(cnt[i][j], mx)) / denom;
-            f64 v = min((f64)1, f64(cnt[i*(N/2+1)+N/2-1-min(j,N-1-j)]) / f64(mx));
+            f64 v = min((f64)1, f64(cnt[i*N+j]) / f64(mx));
             unsigned char g = (unsigned char)std::round(255.0 * v);
             image[i][j] = {g,g,g};
         }
