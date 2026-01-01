@@ -1,4 +1,4 @@
-Highly optimized script for generating high quality buddhabrots.
+Highly optimized script for generating high resolution buddhabrots.
 
 <table>
   <tr>
