@@ -1,3 +1,5 @@
+Highly optimized script for generating high quality buddhabrots.
+
 <table>
   <tr>
     <th>Buddhabrot with 20000 iteration cutoff from wikipedia</th>
